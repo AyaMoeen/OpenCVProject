@@ -1,0 +1,96 @@
+import cv2
+import numpy as np
+import math
+
+# Open the video capture
+cap = cv2.VideoCapture(0)  # Use 0 for the default camera
+
+# Initialize zoom factor and zoom increment
+zoom_factor = 1.0
+zoom_increment = 0.1
+lower_green = np.array([40, 50, 50])   # Adjust these values as per your requirement
+upper_green = np.array([80, 255, 255])  # Adjust these values as per your requirement
+
+prev_distance = 0
+
+
+while True:
+    # Read the frame from the video capture
+    ret, frame = cap.read()
+    
+    # Convert the frame to HSV color space
+    frame_hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+    # Create a mask to extract green color regions
+    mask = cv2.inRange(frame_hsv, lower_green, upper_green)
+
+    # Find contours in the mask
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    # Check if at least two green regions are detected
+    if len(contours) >= 2:
+      contour_sizes = [(cv2.contourArea(cnt), cnt) for cnt in contours]
+      contour_sizes.sort(key=lambda x: x[0], reverse=True)
+      largest_contour = contour_sizes[0][1]
+      second_largest_contour = contour_sizes[1][1]
+       
+        
+        
+        
+      try:
+            M1 = cv2.moments(largest_contour)
+            M2 = cv2.moments(second_largest_contour)
+            cx1 = int(M1['m10'] / M1['m00'])
+            cy1 = int(M1['m01'] / M1['m00'])
+            cx2 = int(M2['m10'] / M2['m00'])
+            cy2 = int(M2['m01'] / M2['m00'])
+            distance = math.sqrt((cx2 - cx1) ** 2 + (cy2 - cy1) ** 2)
+      except ZeroDivisionError:
+            # Handle the ZeroDivisionError exception
+            distance = 0.0
+        # Draw circles around the two largest green regions
+      cv2.circle(frame, (cx1, cy1), 5, (0, 0, 255), -1)
+      cv2.circle(frame, (cx2, cy2), 5, (0, 0, 255), -1)
+
+    # Calculate the new dimensions based on the zoom factor
+    height, width = frame.shape[:2]
+    new_height = int(height * zoom_factor)
+    new_width = int(width * zoom_factor)
+
+    # Calculate the top-left coordinates of the zoomed region
+    top_left_x = (width - new_width) // 2
+    top_left_y = (height - new_height) // 2
+    bottom_right_x = top_left_x + new_width
+    bottom_right_y = top_left_y + new_height
+
+    # Extract the zoomed region from the frame
+    zoomed_frame = frame[top_left_y:bottom_right_y, top_left_x:bottom_right_x]
+
+    # Resize the zoomed frame back to the original frame size
+    zoomed_frame = cv2.resize(zoomed_frame, (width, height))
+
+    # Display the zoomed frame
+    cv2.imshow("Zoomed Frame", zoomed_frame)
+
+    # Listen for key press
+    
+
+    if distance > prev_distance:
+        zoom_factor += zoom_increment
+        prev_distance=distance
+        print(distance)
+
+    elif distance < prev_distance:
+        prev_distance=distance
+        zoom_factor -=zoom_increment
+        if zoom_factor < zoom_increment:
+            zoom_factor = zoom_increment
+            
+    # Exit the loop when 'q' key is pressed
+    if cv2.waitKey(1) == ord("m"):
+        break
+
+# Release the video capture and close the windows
+cap.release()
+cv2.destroyAllWindows()
+
